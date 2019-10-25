@@ -10,6 +10,7 @@ var board_size = 16;
 var highscore = 0;
 var ongoingTouches = [];
 var touch_max_dist = [];
+var prev_tap = null;
 var in_anim = false;
 
 function handleStart(evt) {
@@ -28,6 +29,7 @@ function handleMove(evt) {
 	var el = document.getElementById("game");
 	var ctx = el.getContext("2d");
 	var touches = evt.changedTouches;
+	var g_s = el.width / board_size;
 	for (var i = 0; i < touches.length; i++) {
 		var idx = ongoingTouchIndexById(touches[i].identifier);
 		if (idx >= 0) {
@@ -35,7 +37,36 @@ function handleMove(evt) {
 			var start_y = ongoingTouches[idx].pageY;
 			var dist_x = touches[i].pageX - start_x;
 			var dist_y = touches[i].pageY - start_y;
-			ongoingTouches.splice(idx, 1, copyTouch(touches[i]));  // swap in the new touch record
+      if (!game_over && !in_anim){
+        if (dist_y < -g_s){
+          if (n_rev < (board_size / 4) - 1){
+            n_rev += 1;
+          }
+          ongoingTouches.splice(idx, 1, copyTouch(touches[i]));  // swap in the new touch record
+        }
+        if (dist_y > g_s){
+          if (n_rev > 0){
+            n_rev -= 1;
+          }
+          ongoingTouches.splice(idx, 1, copyTouch(touches[i]));  // swap in the new touch record
+        }
+        if (dist_x > g_s){
+          var tmp = reserves[n_rev].pop();
+          reserves[n_rev].unshift(tmp);
+          ongoingTouches.splice(idx, 1, copyTouch(touches[i]));  // swap in the new touch record
+        }
+        if (dist_x < -g_s){
+          var tmp = reserves[n_rev].shift();
+          reserves[n_rev].push(tmp);
+          ongoingTouches.splice(idx, 1, copyTouch(touches[i]));  // swap in the new touch record
+        }
+        var dist = Math.sqrt(dist_x * dist_x + dist_y * dist_y);
+        if (touch_max_dist[idx] < dist) {
+          touch_max_dist[idx] = dist;
+        }
+      }else{
+        ongoingTouches.splice(idx, 1, copyTouch(touches[i]));  // swap in the new touch record
+      }
 		}
 	}
 }
@@ -45,10 +76,28 @@ function handleEnd(evt) {
 	var el = document.getElementById("game");
 	var ctx = el.getContext("2d");
 	var touches = evt.changedTouches;
+	var g_s = el.width / board_size;
 	for (var i = 0; i < touches.length; i++) {
 		var idx = ongoingTouchIndexById(touches[i].identifier);
 		if (idx >= 0) {
+      if (!game_over && !in_anim){
+        if (touch_max_dist[idx] < g_s/2){
+          if (prev_tap == null){
+            prev_tap = copyTouch(ongoingTouches[idx]);
+          }else{
+            var dist_x = ongoingTouches[idx].pageX - prev_tap.pageX;
+            var dist_y = ongoingTouches[idx].pageY - prev_tap.pageY;
+            if (Math.sqrt(dist_x * dist_x + dist_y * dist_y) < g_s / 2){
+              prev_tap = null;
+              checkRound();
+            }else{
+              prev_tap = copyTouch(ongoingTouches[idx]);
+            }
+          }
+        }
+      }
 			ongoingTouches.splice(idx, 1);  // remove it; we're done
+		  touch_max_dist.splice(idx, 1);  // remove it; we're done
 		}
 	}
 }
@@ -196,6 +245,10 @@ function draw(){
 	var g_s = c.width / board_size;
 	var g_m = g_s / 15;
 	var timer_colour = "rgb(128," + (timer * 255) + ",0)";
+	for (var i = 0; i < 4; i++){
+    ctx.fillStyle = "#548";
+		ctx.fillRect(g_s * i + g_m/2, c.height/2.0 - g_s/2 - g_m/2, g_s - g_m, g_s - g_m);
+	}
 	for (var i = 0; i < board_size + 1; i++){
 		if (i == board_size){
 			ctx.fillStyle = "#333";
